@@ -1,0 +1,784 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Аудиоплеер"><meta name="theme-color" content="#F5EFE4" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#1C1915" media="(prefers-color-scheme: dark)"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-180.png"><link rel="icon" href="icon-192.png"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Аудиоплеер</title>
+<style>
+/* Layout: приложение, а не сайт. Контент сверху листается, всё управление живёт внизу: таб-бар, мини-плеер, поиск, листы. Тон: молоко и слоновая кость, тёплый кофейный акцент. */
+:root{
+  --bg:#F5EFE4; --surface:#FFFCF6; --surface-2:#ECE3D4; --line:#E1D6C4;
+  --fg:#2E2822; --muted:#877C6E; --accent:#8A6D4B; --accent-ink:#FFFCF6;
+  --caramel:#B9786A; --lavender:#8A90C4; --danger:#B9533F;
+  --bar:rgba(245,239,228,.88); --shadow:0 12px 32px rgba(70,52,30,.10); --shadow-s:0 2px 8px rgba(70,52,30,.06);
+  --f-display:ui-rounded,"SF Pro Rounded",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  --f-body:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,Roboto,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#1C1915; --surface:#26221D; --surface-2:#302B25; --line:#3B352E;
+  --fg:#F2EBDF; --muted:#A89D8E; --accent:#DCC7A4; --accent-ink:#2A2117;
+  --caramel:#D9A091; --lavender:#A9AEE0; --danger:#EE8A75;
+  --bar:rgba(28,25,21,.88); --shadow:0 12px 32px rgba(0,0,0,.45); --shadow-s:0 2px 8px rgba(0,0,0,.3); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#1C1915; --surface:#26221D; --surface-2:#302B25; --line:#3B352E;
+  --fg:#F2EBDF; --muted:#A89D8E; --accent:#DCC7A4; --accent-ink:#2A2117;
+  --caramel:#D9A091; --lavender:#A9AEE0; --danger:#EE8A75;
+  --bar:rgba(28,25,21,.88); --shadow:0 12px 32px rgba(0,0,0,.45); --shadow-s:0 2px 8px rgba(0,0,0,.3); color-scheme:dark}
+
+*{box-sizing:border-box}
+html,body{background:var(--bg)}
+body{color:var(--fg);font-family:var(--f-body);font-size:16px;line-height:1.4;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased;
+  --tabh:calc(64px + env(safe-area-inset-bottom,0px));--dock:calc(var(--tabh) + 12px)}
+body.has-mini{--dock:calc(var(--tabh) + 84px)}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none;padding:0;-webkit-user-select:none;user-select:none}
+button:disabled{opacity:.4;cursor:default}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:10px}
+.num{font-variant-numeric:tabular-nums}
+
+.wrap{max-width:620px;margin:0 auto;padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px));padding-block:18px calc(var(--dock) + 96px)}
+body.in-search .wrap{padding-block-end:calc(var(--dock) + 150px)}
+
+.ttl{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin:14px 2px 14px}
+.ttl h1{font-family:var(--f-display);font-weight:700;font-size:32px;letter-spacing:-.02em;margin:0;line-height:1.1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ttl .meta{color:var(--muted);font-size:14px;white-space:nowrap;padding-bottom:4px}
+.back{display:inline-flex;align-items:center;gap:2px;color:var(--accent);font-weight:600;font-size:16px;margin:6px 0 -4px -6px;padding:6px}
+.back svg{width:22px;height:22px}
+
+.chips{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 14px;margin:0 -2px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chips.sub{margin-top:-6px}.chips.sub .chip{padding:6px 13px;font-size:13.5px;background:transparent;border:1px solid var(--line)}.chips.sub .chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.sortrow{display:flex;align-items:center;gap:4px;margin:-4px 0 14px;font-size:13.5px;color:var(--muted);overflow-x:auto;scrollbar-width:none}.sortrow::-webkit-scrollbar{display:none}.sortrow span{margin-right:4px;flex:none}.sortrow button{flex:none;padding:5px 10px;border-radius:10px;color:var(--muted);font-weight:500}.sortrow button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg);font-weight:600}
+.chip{flex:none;padding:8px 15px;border-radius:999px;background:var(--surface-2);font-size:14.5px;font-weight:500;color:var(--muted)}
+.chip[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.chip .n{opacity:.6;margin-left:5px;font-variant-numeric:tabular-nums}
+
+.pills{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.pill{display:flex;align-items:center;justify-content:center;gap:8px;padding:13px;border-radius:16px;background:var(--surface);box-shadow:var(--shadow-s);font-weight:600;color:var(--accent)}
+.pill.solid{background:var(--accent);color:var(--accent-ink);box-shadow:none}
+.pill svg{width:19px;height:19px}
+
+.list{display:flex;flex-direction:column;background:var(--surface);border-radius:22px;box-shadow:var(--shadow-s);overflow:hidden}
+.row{display:flex;align-items:center;gap:6px;padding:9px 6px 9px 12px;position:relative;min-width:0}
+.row+.row::before{content:"";position:absolute;top:0;left:68px;right:0;border-top:1px solid var(--line)}
+.row.current{background:color-mix(in srgb,var(--accent) 8%,var(--surface))}
+.row .main{flex:1;min-width:0;text-align:left;display:flex;align-items:center;gap:12px;padding:2px 0}
+.cover{width:46px;height:46px;border-radius:14px;flex:none;display:grid;place-items:center;font-family:var(--f-display);font-size:16px;font-weight:700}
+.cover.quran{background:color-mix(in srgb,var(--accent) 16%,var(--surface));color:var(--accent)}
+.cover.nasheed{background:color-mix(in srgb,var(--caramel) 18%,var(--surface));color:var(--caramel)}
+.cover.lecture{background:color-mix(in srgb,var(--lavender) 20%,var(--surface));color:var(--lavender)}
+.cover.other{background:var(--surface-2);color:var(--muted)}
+.cover[class*=" u_"]{background:color-mix(in srgb,var(--lavender) 20%,var(--surface));color:var(--lavender)}
+.chip.addc{background:transparent;border:1px dashed var(--line);color:var(--accent);font-weight:600}
+.ucat-tools{display:flex;gap:14px;margin:-6px 2px 12px;font-size:13.5px}.ucat-tools button{color:var(--accent);font-weight:600;padding:2px 0}.ucat-tools button+button{color:var(--danger)}
+.seg.wrap{flex-wrap:wrap}.seg .newc{color:var(--accent);font-weight:600}
+.row .txt{min-width:0;flex:1}
+.row .t{font-weight:600;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .s{font-size:14px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.row .prog{height:3px;border-radius:2px;background:var(--surface-2);margin-top:6px;overflow:hidden;max-width:160px}
+.row .prog i{display:block;height:100%;background:var(--caramel);border-radius:2px}
+.ib{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;color:var(--muted);flex:none}
+.ib:active{background:var(--surface-2)}
+.ib svg{width:21px;height:21px}
+.eq{display:inline-flex;gap:2px;align-items:flex-end;height:12px;margin-right:7px;vertical-align:-1px}
+.eq i{width:3px;background:var(--accent);border-radius:2px;height:4px}
+body.is-playing .eq i{animation:eq .9s infinite ease-in-out}
+.eq i:nth-child(2){animation-delay:.2s!important}.eq i:nth-child(3){animation-delay:.4s!important}
+@keyframes eq{0%,100%{height:3px}50%{height:12px}}
+
+.empty{text-align:center;padding:34px 22px 28px;background:var(--surface);border-radius:24px;box-shadow:var(--shadow-s)}
+.empty .ill{width:72px;height:72px;margin:0 auto 10px;border-radius:24px;background:color-mix(in srgb,var(--accent) 14%,var(--surface));display:grid;place-items:center;color:var(--accent)}
+.empty .ill svg{width:36px;height:36px}
+.empty h3{font-family:var(--f-display);font-weight:700;font-size:21px;margin:0 0 8px;text-wrap:balance}
+.empty p{color:var(--muted);margin:0 auto;max-width:32ch;font-size:15px}
+.steps{text-align:left;max-width:34ch;margin:18px auto 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px;font-size:15px;color:var(--muted)}
+.steps li{display:flex;gap:12px;align-items:flex-start}
+.steps b{flex:none;width:24px;height:24px;border-radius:50%;background:var(--surface-2);color:var(--fg);display:grid;place-items:center;font-size:13px}
+.hint{margin-top:22px;color:var(--muted);font-size:14px;display:flex;align-items:center;justify-content:center;gap:6px}
+.hint svg{width:18px;height:18px;color:var(--accent)}
+
+.pl-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+@media (min-width:560px){.pl-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.pl-card{text-align:left;display:flex;flex-direction:column;gap:9px;min-width:0}
+.pl-card .art{aspect-ratio:1;width:100%;max-width:100%;border-radius:22px;display:grid;grid-template-columns:1fr 1fr;gap:4px;overflow:hidden;padding:4px;background:var(--surface);box-shadow:var(--shadow-s)}
+.pl-card .art span{border-radius:16px}
+.pl-card .nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-left:2px}
+.pl-card .ct{font-size:13.5px;color:var(--muted);padding-left:2px;margin-top:-6px}
+.pl-card.new .art{display:grid;place-items:center;grid-template-columns:1fr;background:transparent;border:2px dashed var(--line);box-shadow:none;color:var(--muted)}
+.pl-card.new .art svg{width:30px;height:30px}
+
+.sec{font-size:13px;font-weight:600;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;margin:6px 4px 8px}
+
+/* tab bar */
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:30;height:var(--tabh);padding-bottom:env(safe-area-inset-bottom,0px);
+  padding-left:max(8px,env(safe-area-inset-left,0px));padding-right:max(8px,env(safe-area-inset-right,0px));
+  background:var(--bar);-webkit-backdrop-filter:blur(18px) saturate(1.4);backdrop-filter:blur(18px) saturate(1.4);border-top:1px solid var(--line)}
+.tabbar .in{max-width:620px;margin:0 auto;height:64px;display:grid;grid-template-columns:repeat(4,1fr);align-items:center}
+.tab{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:600;color:var(--muted);padding:6px 0}
+.tab svg{width:25px;height:25px}
+.tab[aria-current="page"]{color:var(--accent)}
+.tab.add .dot{width:46px;height:46px;border-radius:16px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;box-shadow:0 6px 16px color-mix(in srgb,var(--accent) 35%,transparent)}
+.tab.add .dot svg{width:24px;height:24px}
+.tab.add{gap:0}
+
+/* mini */
+#mini{position:fixed;left:0;right:0;bottom:calc(var(--tabh) + 8px);z-index:29;padding-left:max(10px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px));pointer-events:none}
+#mini .bar{pointer-events:auto;max-width:600px;margin:0 auto;background:var(--surface);border-radius:20px;box-shadow:var(--shadow);overflow:hidden;border:1px solid var(--line)}
+#mini .in{display:flex;align-items:center;gap:4px;padding:8px 6px 8px 8px}
+#mini .open{flex:1;min-width:0;text-align:left;display:flex;align-items:center;gap:11px}
+#mini .cover{width:44px;height:44px;border-radius:13px}
+#mini .t{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#mini .s{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#mini .ib{color:var(--fg);width:44px;height:44px}
+#mini .ib svg{width:24px;height:24px}
+#mini .line{height:3px;background:var(--surface-2)}
+#mini .line i{display:block;height:100%;background:var(--accent);width:0}
+
+/* search dock */
+#sdock{position:fixed;left:0;right:0;bottom:var(--dock);z-index:28;padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}
+#sdock .in{max-width:600px;margin:0 auto;position:relative}
+#sdock input{width:100%;padding:14px 16px 14px 44px;border-radius:18px;border:1px solid var(--line);background:var(--surface);font-size:17px;box-shadow:var(--shadow);-webkit-appearance:none;appearance:none}
+#sdock svg{position:absolute;left:15px;top:50%;transform:translateY(-50%);width:19px;height:19px;color:var(--muted)}
+
+/* now playing */
+#np{position:fixed;inset:0;z-index:40;background:var(--bg);display:flex;flex-direction:column;
+  padding-top:calc(8px + env(safe-area-inset-top,0px));padding-bottom:calc(14px + env(safe-area-inset-bottom,0px));
+  padding-left:max(22px,env(safe-area-inset-left,0px));padding-right:max(22px,env(safe-area-inset-right,0px));overflow-y:auto;animation:up .28s cubic-bezier(.2,.8,.2,1)}
+@keyframes up{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
+#np .in{max-width:480px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:20px;flex:1;min-height:0}
+#np .grab{width:42px;height:5px;border-radius:3px;background:var(--line);margin:2px auto 0}
+#np .topbar{display:flex;align-items:center;justify-content:space-between;margin-top:-10px}
+#np .from{font-size:13px;color:var(--muted);font-weight:600;text-align:center;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 8px}
+#np .art{flex:1;display:grid;place-items:center;min-height:0}
+.disc{width:min(78vw,320px,38vh);aspect-ratio:1;max-width:100%;border-radius:36px;position:relative;overflow:hidden;box-shadow:var(--shadow)}
+.disc canvas{position:absolute;inset:0;width:100%;height:100%}
+.disc .cat{position:absolute;left:16px;bottom:16px;font-size:13px;font-weight:600;padding:6px 12px;border-radius:999px;background:var(--surface);color:var(--fg)}
+.np-t{display:flex;align-items:center;gap:8px}
+.np-t .txt{flex:1;min-width:0}
+#npT{font-family:var(--f-display);font-weight:700;font-size:23px;line-height:1.2;margin:0;overflow-wrap:anywhere}
+#npA{color:var(--muted);margin-top:3px;font-size:16px;overflow-wrap:anywhere}
+.seek{display:flex;flex-direction:column;gap:2px}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:30px;background:transparent;margin:0}
+input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:3px;background:linear-gradient(to right,var(--fg) var(--p,0%),var(--surface-2) var(--p,0%))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--fg);margin-top:-6px;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+input[type=range]::-moz-range-track{height:6px;border-radius:3px;background:var(--surface-2)}
+input[type=range]::-moz-range-progress{height:6px;border-radius:3px;background:var(--fg)}
+input[type=range]::-moz-range-thumb{width:18px;height:18px;border:0;border-radius:50%;background:var(--fg)}
+.times{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.ctrls{display:flex;align-items:center;justify-content:space-between}
+.ctrls .ib{width:56px;height:56px;color:var(--fg);border-radius:50%}
+.ctrls .ib svg{width:30px;height:30px}
+.ctrls .skip{position:relative}
+.ctrls .skip small{position:absolute;font-size:10px;font-weight:700;top:50%;left:50%;transform:translate(-50%,-36%)}
+.playbig{width:80px;height:80px;border-radius:50%;background:var(--fg);color:var(--bg);display:grid;place-items:center;box-shadow:var(--shadow)}
+.playbig:active{transform:scale(.96)}
+.playbig svg{width:34px;height:34px}
+.opts{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;background:var(--surface);border-radius:22px;padding:6px;box-shadow:var(--shadow-s)}
+.opt{border-radius:16px;padding:9px 2px 7px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;color:var(--muted);font-weight:600;min-width:0}
+.opt svg{width:22px;height:22px}
+.opt b{font-size:15px;color:var(--fg);line-height:22px;font-variant-numeric:tabular-nums}
+.opt span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.opt.on{background:color-mix(in srgb,var(--accent) 14%,var(--surface));color:var(--accent)}
+.opt.on b{color:var(--accent)}
+
+/* sheet */
+#scrim{position:fixed;inset:0;background:rgba(40,30,20,.32);z-index:50;animation:fade .2s}
+@keyframes fade{from{opacity:0}}
+#sheet{position:fixed;left:0;right:0;bottom:0;z-index:51}
+#sheet .card{max-width:560px;margin:0 auto;background:var(--surface);border-radius:28px 28px 0 0;
+  padding:8px max(20px,env(safe-area-inset-left,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(20px,env(safe-area-inset-right,0px));
+  max-height:88vh;overflow-y:auto;box-shadow:var(--shadow);animation:up .25s cubic-bezier(.2,.8,.2,1)}
+#sheet .grab{width:42px;height:5px;border-radius:3px;background:var(--line);margin:4px auto 14px}
+#sheet h3{font-family:var(--f-display);font-weight:700;font-size:20px;margin:0 0 4px;overflow-wrap:anywhere}
+#sheet .sub{color:var(--muted);font-size:14.5px;margin-bottom:16px;overflow-wrap:anywhere}
+.menu{display:flex;flex-direction:column;background:var(--bg);border-radius:18px;overflow:hidden}
+.menu button{display:flex;align-items:center;gap:14px;padding:15px 16px;text-align:left;font-weight:500;font-size:16px;position:relative}
+.menu button+button::before{content:"";position:absolute;top:0;left:51px;right:0;border-top:1px solid var(--line)}
+.menu button:active{background:var(--surface-2)}
+.menu button svg{width:22px;height:22px;color:var(--accent);flex:none}
+.menu button.danger{color:var(--danger)}.menu button.danger svg{color:var(--danger)}
+.field{display:flex;flex-direction:column;gap:7px;margin-bottom:14px}
+.field label{font-size:13px;font-weight:600;color:var(--muted)}
+.field input{padding:13px 14px;border-radius:14px;border:1px solid var(--line);background:var(--bg);font-size:17px;width:100%;-webkit-appearance:none;appearance:none}
+.seg{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;background:var(--bg);padding:4px;border-radius:14px}
+.seg button{padding:10px 2px;border-radius:11px;font-size:13.5px;font-weight:600;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--fg);box-shadow:var(--shadow-s)}
+.sheet-actions{display:flex;gap:10px;margin-top:18px}
+.btn{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:15px;border-radius:16px;font-weight:600;font-size:16px;background:var(--surface-2)}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn.red{background:var(--danger);color:#fff}
+.checklist{display:flex;flex-direction:column;max-height:48vh;overflow-y:auto;background:var(--bg);border-radius:18px}
+.checklist label{display:flex;align-items:center;gap:12px;padding:12px 14px;min-width:0;position:relative}
+.checklist label+label::before{content:"";position:absolute;top:0;left:46px;right:0;border-top:1px solid var(--line)}
+.checklist input{width:22px;height:22px;accent-color:var(--accent);flex:none}
+.checklist .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.checklist .au{font-size:13px;color:var(--muted)}
+.qlist{display:flex;flex-direction:column;background:var(--bg);border-radius:18px;overflow:hidden;max-height:56vh;overflow-y:auto}
+.qlist button{display:flex;gap:12px;align-items:center;padding:12px 14px;text-align:left;min-width:0;position:relative}
+.qlist button+button::before{content:"";position:absolute;top:0;left:48px;right:0;border-top:1px solid var(--line)}
+.qlist .i{width:22px;flex:none;color:var(--muted);font-size:14px;font-variant-numeric:tabular-nums;text-align:right}
+.qlist .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qlist .cur{color:var(--accent);font-weight:600}
+
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--dock) + 8px);z-index:60;background:var(--fg);color:var(--bg);padding:11px 18px;border-radius:16px;font-size:14.5px;font-weight:500;box-shadow:var(--shadow);max-width:calc(100vw - 32px);text-align:center}
+body.in-search #toast{bottom:calc(var(--dock) + 70px)}
+.reorder{display:flex}
+.busy{padding:40px;text-align:center;color:var(--muted)}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-play" viewBox="0 0 24 24"><path fill="currentColor" d="M8 5.2v13.6c0 .8.9 1.3 1.6.9l10.6-6.8c.6-.4.6-1.3 0-1.7L9.6 4.3C8.9 3.9 8 4.4 8 5.2z"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><rect fill="currentColor" x="6" y="4.5" width="4.2" height="15" rx="1.4"/><rect fill="currentColor" x="13.8" y="4.5" width="4.2" height="15" rx="1.4"/></symbol>
+    <symbol id="i-next" viewBox="0 0 24 24"><path fill="currentColor" d="M4.5 6.2v11.6c0 .8.9 1.3 1.6.8l8.4-5.8c.6-.4.6-1.2 0-1.6L6.1 5.4c-.7-.5-1.6 0-1.6.8z"/><rect fill="currentColor" x="16.6" y="5" width="2.8" height="14" rx="1.3"/></symbol>
+    <symbol id="i-prev" viewBox="0 0 24 24"><path fill="currentColor" d="M19.5 6.2v11.6c0 .8-.9 1.3-1.6.8l-8.4-5.8c-.6-.4-.6-1.2 0-1.6l8.4-5.8c.7-.5 1.6 0 1.6.8z"/><rect fill="currentColor" x="4.6" y="5" width="2.8" height="14" rx="1.3"/></symbol>
+    <symbol id="i-back15" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M5.5 8.5A8 8 0 1 1 4 13"/><path fill="currentColor" d="M3.2 4.6l.6 5.2 5-1.6z"/></symbol>
+    <symbol id="i-fwd15" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M18.5 8.5A8 8 0 1 0 20 13"/><path fill="currentColor" d="M20.8 4.6l-.6 5.2-5-1.6z"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle fill="currentColor" cx="5.5" cy="12" r="1.9"/><circle fill="currentColor" cx="12" cy="12" r="1.9"/><circle fill="currentColor" cx="18.5" cy="12" r="1.9"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle fill="none" stroke="currentColor" stroke-width="2" cx="11" cy="11" r="6.5"/><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M16 16l4 4"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></symbol>
+    <symbol id="i-left" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M15 5l-7 7 7 7"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M6 15l6-6 6 6"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M4 6h11M4 12h11M4 18h7M18 14v7M14.5 17.5h7"/></symbol>
+    <symbol id="i-queue" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M4 6h16M4 12h16M4 18h10"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" d="M12 15V3M7.5 7.5L12 3l4.5 4.5M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
+    <symbol id="i-repeat" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" d="M17 3l3 3-3 3M4 11V9a3 3 0 0 1 3-3h13M7 21l-3-3 3-3M20 13v2a3 3 0 0 1-3 3H4"/></symbol>
+    <symbol id="i-shuffle" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" d="M17 3l3 3-3 3M17 15l3 3-3 3M4 6h3c5 0 5 12 10 12h3M4 18h3c1.6 0 2.6-1.2 3.4-2.8M13.6 8.8C14.4 7.2 15.4 6 17 6h3"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></symbol>
+    <symbol id="i-wave" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></symbol>
+    <symbol id="i-lib" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M5 4v16M10 4v16"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M14.5 4.8l4.2 14.4"/></symbol>
+    <symbol id="i-pls" viewBox="0 0 24 24"><rect fill="none" stroke="currentColor" stroke-width="2" x="3.5" y="3.5" width="7" height="7" rx="2"/><rect fill="none" stroke="currentColor" stroke-width="2" x="13.5" y="3.5" width="7" height="7" rx="2"/><rect fill="none" stroke="currentColor" stroke-width="2" x="3.5" y="13.5" width="7" height="7" rx="2"/><rect fill="none" stroke="currentColor" stroke-width="2" x="13.5" y="13.5" width="7" height="7" rx="2"/></symbol>
+  </defs>
+</svg>
+
+<audio id="au" preload="metadata" playsinline></audio>
+<input type="file" id="picker" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.opus,.flac" multiple hidden>
+
+<main id="main" class="wrap"><div class="busy">Загружаю записи…</div></main>
+
+<div id="sdock" hidden><div class="in"><svg><use href="#i-search"/></svg><input id="q" type="search" placeholder="Название или автор" autocomplete="off" enterkeyhint="search"></div></div>
+
+<div id="mini" hidden>
+  <div class="bar">
+    <div class="line"><i id="miniLine"></i></div>
+    <div class="in">
+      <button class="open" data-act="openNP">
+        <div class="cover" id="miniCover"></div>
+        <div style="min-width:0"><div class="t" id="miniT"></div><div class="s" id="miniS"></div></div>
+      </button>
+      <button class="ib" data-act="toggle" aria-label="Пауза или воспроизведение"><svg id="miniPP"><use href="#i-play"/></svg></button>
+      <button class="ib" data-act="next" aria-label="Следующая"><svg><use href="#i-next"/></svg></button>
+    </div>
+  </div>
+</div>
+
+<nav class="tabbar" aria-label="Разделы"><div class="in">
+  <button class="tab" data-act="tab" data-tab="library" id="tb-library"><svg><use href="#i-lib"/></svg>Записи</button>
+  <button class="tab" data-act="tab" data-tab="playlists" id="tb-playlists"><svg><use href="#i-pls"/></svg>Плейлисты</button>
+  <button class="tab" data-act="tab" data-tab="search" id="tb-search"><svg><use href="#i-search"/></svg>Поиск</button>
+  <button class="tab add" data-act="add" aria-label="Добавить файлы"><span class="dot"><svg><use href="#i-plus"/></svg></span></button>
+</div></nav>
+
+<section id="np" hidden aria-label="Сейчас играет">
+  <div class="in">
+    <div class="grab"></div>
+    <div class="topbar">
+      <button class="ib" data-act="closeNP" aria-label="Свернуть"><svg><use href="#i-down"/></svg></button>
+      <span class="from" id="npFrom">Сейчас играет</span>
+      <button class="ib" data-act="npMore" aria-label="Действия"><svg><use href="#i-more"/></svg></button>
+    </div>
+    <div class="art"><div class="disc"><canvas id="discCv"></canvas><span class="cat" id="npCat"></span></div></div>
+    <div class="np-t"><div class="txt"><h2 id="npT"></h2><div id="npA"></div></div></div>
+    <div class="seek">
+      <input type="range" id="seek" min="0" max="1000" value="0" step="1" aria-label="Перемотка">
+      <div class="times"><span id="tCur">0:00</span><span id="tLeft">-0:00</span></div>
+    </div>
+    <div class="ctrls">
+      <button class="ib skip" data-act="back15" aria-label="Назад на 15 секунд"><svg><use href="#i-back15"/></svg><small>15</small></button>
+      <button class="ib" data-act="prev" aria-label="Предыдущая"><svg><use href="#i-prev"/></svg></button>
+      <button class="playbig" data-act="toggle" aria-label="Пауза или воспроизведение"><svg id="npPP"><use href="#i-play"/></svg></button>
+      <button class="ib" data-act="next" aria-label="Следующая"><svg><use href="#i-next"/></svg></button>
+      <button class="ib skip" data-act="fwd15" aria-label="Вперёд на 15 секунд"><svg><use href="#i-fwd15"/></svg><small>15</small></button>
+    </div>
+    <div class="opts">
+      <button class="opt" id="optSpeed" data-act="speed"><b id="speedVal">1×</b><span>Скорость</span></button>
+      <button class="opt" id="optRepeat" data-act="repeat"><svg><use href="#i-repeat"/></svg><span id="repeatLbl">Повтор</span></button>
+      <button class="opt" id="optShuffle" data-act="shuffle"><svg><use href="#i-shuffle"/></svg><span>Микс</span></button>
+      <button class="opt" id="optSleep" data-act="sleep"><svg><use href="#i-moon"/></svg><span id="sleepLbl">Сон</span></button>
+      <button class="opt" data-act="queue"><svg><use href="#i-queue"/></svg><span>Очередь</span></button>
+    </div>
+  </div>
+</section>
+
+<div id="scrim" hidden data-act="closeSheet"></div>
+<div id="sheet" hidden><div class="card" id="sheetCard"></div></div>
+<div id="toast" hidden></div>
+
+<script>
+(function(){
+"use strict";
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+const nat=(a,b)=>String(a||"").localeCompare(String(b||""),"ru",{numeric:true,sensitivity:"base"});
+const SORTS={order:{l:"По порядку",f:(a,b)=>nat(a.title,b.title)||nat(a.author,b.author)},author:{l:"По автору",f:(a,b)=>nat(a.author||"яяя",b.author||"яяя")||nat(a.title,b.title)},new:{l:"Новые",f:(a,b)=>b.added-a.added}};
+const CATS={quran:"Коран",nasheed:"Нашиды",lecture:"Лекции",other:"Другое"};
+const CAT1={quran:"Коран",nasheed:"Нашид",lecture:"Лекция",other:"Запись"};
+const CATMARK={quran:"ق",nasheed:"♪",lecture:"Л",other:"•"};
+const BASECATS=Object.keys(CATS);let UCATS=[];
+function applyUcats(){for(const k of Object.keys(CATS))if(!BASECATS.includes(k)){delete CATS[k];delete CAT1[k];delete CATMARK[k]}
+  const o=CATS.other;delete CATS.other;UCATS.forEach(c=>{CATS[c.id]=c.name;CAT1[c.id]=c.name;CATMARK[c.id]=(c.name.trim()[0]||"•").toUpperCase()});CATS.other=o}
+const isU=k=>!!k&&k!=="all"&&!BASECATS.includes(k)&&!!CATS[k];
+const EXT={mp3:"audio/mpeg",m4a:"audio/mp4",mp4:"audio/mp4",aac:"audio/aac",wav:"audio/wav",ogg:"audio/ogg",opus:"audio/ogg",flac:"audio/flac",m4b:"audio/mp4",caf:"audio/x-caf"};
+const typeOf=f=>{const e=(f.name.split(".").pop()||"").toLowerCase();return EXT[e]||(f.type&&f.type.startsWith("audio/")?f.type:"audio/mpeg")};
+const toDataUrl=blob=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(r.error);r.readAsDataURL(blob)});
+const plural=(n,a,b,c)=>{const m=n%10,h=n%100;return n+" "+(m===1&&h!==11?a:m>=2&&m<=4&&(h<10||h>=20)?b:c)};
+const recs=n=>plural(n,"запись","записи","записей");
+
+/* ---------- storage ---------- */
+const LS={get(k,d){try{const v=localStorage.getItem("nur:"+k);return v==null?d:JSON.parse(v)}catch(e){return d}},
+          set(k,v){try{localStorage.setItem("nur:"+k,JSON.stringify(v))}catch(e){}}};
+const DB=(()=>{let p;
+  function open(){return p||(p=new Promise((res,rej)=>{
+    let r;try{r=indexedDB.open("nur-player",1)}catch(e){rej(e);return}
+    r.onupgradeneeded=()=>{const d=r.result;
+      if(!d.objectStoreNames.contains("tracks"))d.createObjectStore("tracks",{keyPath:"id"});
+      if(!d.objectStoreNames.contains("blobs"))d.createObjectStore("blobs");
+      if(!d.objectStoreNames.contains("playlists"))d.createObjectStore("playlists",{keyPath:"id"});};
+    r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);}))}
+  async function tx(store,mode,fn){const d=await open();return new Promise((res,rej)=>{
+    const t=d.transaction(store,mode),s=t.objectStore(store);let out;const q=fn(s);
+    if(q)q.onsuccess=()=>{out=q.result};t.oncomplete=()=>res(out);t.onerror=t.onabort=()=>rej(t.error)})}
+  return{all:s=>tx(s,"readonly",st=>st.getAll()),get:(s,k)=>tx(s,"readonly",st=>st.get(k)),
+    put:(s,v,k)=>tx(s,"readwrite",st=>k===undefined?st.put(v):st.put(v,k)),del:(s,k)=>tx(s,"readwrite",st=>st.delete(k))};})();
+
+/* ---------- state ---------- */
+const S={tracks:[],playlists:[],view:"library",plId:null,editPl:false,cat:"all",author:"",sort:LS.get("sort","order"),q:"",
+  queue:[],orig:null,qi:-1,from:"",repeat:LS.get("repeat","off"),shuffle:false,rate:LS.get("rate",1),
+  sleepAt:null,sleepEnd:false,listIds:[],noDB:false};
+const pos=LS.get("pos",{});
+const byId=id=>S.tracks.find(t=>t.id===id);
+const au=$("#au");
+
+/* ---------- helpers ---------- */
+function fmt(s){s=Math.max(0,Math.floor(s||0));const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;
+  return h?`${h}:${String(m).padStart(2,"0")}:${String(x).padStart(2,"0")}`:`${m}:${String(x).padStart(2,"0")}`}
+function fmtLong(s){s=Math.round(s||0);const h=Math.floor(s/3600),m=Math.round(s%3600/60);return h?`${h} ч ${m} мин`:`${m} мин`}
+function fmtSize(b){return b>1e9?(b/1e9).toFixed(1)+" ГБ":b>1e6?(b/1e6).toFixed(0)+" МБ":Math.max(1,Math.round(b/1e3))+" КБ"}
+function guessCat(n){n=n.toLowerCase();
+  if(/(коран|qur.?an|quran|сура|surah|sura|juz|джуз|аят|ayat|тиляват|tilawat|recitation|чтец)/.test(n))return"quran";
+  if(/(нашид|nash[ie]e?d|anasheed|нашы)/.test(n))return"nasheed";
+  if(/(лекци|lecture|урок|дарс|dars|тафсир|tafsir|хутб|khutb|бая?н|bayan|проповед|сира|seerah|lesson|вопрос)/.test(n))return"lecture";
+  return"other"}
+function parseName(file){let base=file.replace(/\.[a-z0-9]{2,5}$/i,"").replace(/_/g," ").replace(/\s+/g," ").trim();
+  let author="",title=base;const m=base.split(/\s[-–—]\s/);
+  if(m.length>=2){author=m[0].trim();title=m.slice(1).join(" — ").trim()}
+  return{title:title||base,author}}
+function toast(msg,ms=2200){const t=$("#toast");t.textContent=msg;t.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>t.hidden=true,ms)}
+function durOf(src){return new Promise(res=>{const a=new Audio();let done=false;
+  const fin=v=>{if(done)return;done=true;a.removeAttribute("src");res(isFinite(v)&&v>0?v:0)};
+  a.preload="metadata";a.onloadedmetadata=()=>{if(isFinite(a.duration))fin(a.duration);else{a.ondurationchange=()=>{if(isFinite(a.duration))fin(a.duration)}}};a.onerror=()=>fin(0);setTimeout(()=>fin(0),8000);a.src=src;a.load()})}
+async function getDuration(blob){const u=URL.createObjectURL(blob);let d=await durOf(u);URL.revokeObjectURL(u);
+  if(!d&&blob.size<80e6){try{d=await durOf(await toDataUrl(blob))}catch(e){}}return d}
+
+/* ---------- import ---------- */
+$("#picker").onchange=async e=>{
+  const files=[...e.target.files];e.target.value="";if(!files.length)return;
+  let ok=0;toast(`Добавляю ${files.length}…`,60000);const fresh=[];
+  for(const f of files){
+    try{
+      const buf=await f.arrayBuffer();const ty=typeOf(f);const blob=new Blob([buf],{type:ty});
+      const dur=await getDuration(blob);const p=parseName(f.name);
+      const t={id:uid(),title:p.title,author:p.author,cat:S.view==="library"&&S.cat!=="all"&&CATS[S.cat]?S.cat:guessCat(f.name),fileName:f.name,type:ty,size:f.size,duration:dur,added:Date.now()+ok};
+      await DB.put("blobs",{buf,type:t.type},t.id);await DB.put("tracks",t);S.tracks.push(t);fresh.push(t.id);ok++;
+    }catch(err){console.error(err)}
+  }
+  try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
+  if(S.view==="playlist"&&S.plId&&ok){const pl=S.playlists.find(p=>p.id===S.plId);
+    if(pl){pl.ids.push(...fresh);await DB.put("playlists",pl).catch(()=>{})}}
+  toast(ok===files.length?`Добавлено: ${ok}`:`Добавлено ${ok} из ${files.length}. Остальные не прочитались`);
+  render();
+};
+
+/* ---------- render ---------- */
+function coverHTML(t){return`<div class="cover ${t.cat}">${CATMARK[t.cat]}</div>`}
+function rowHTML(t,i,opts={}){
+  const cur=S.queue[S.qi]===t.id;const p=pos[t.id];const showProg=t.duration>600&&p&&p>30;
+  const right=opts.edit?`<div class="reorder">
+      <button class="ib" data-act="mvUp" data-i="${i}" aria-label="Выше"${i===0?" disabled":""}><svg><use href="#i-up"/></svg></button>
+      <button class="ib" data-act="mvDown" data-i="${i}" aria-label="Ниже"${opts.last?" disabled":""}><svg><use href="#i-down"/></svg></button>
+      <button class="ib" data-act="plRemove" data-i="${i}" aria-label="Убрать"><svg><use href="#i-x"/></svg></button></div>`
+    :`<button class="ib" data-act="trackMenu" data-id="${t.id}" aria-label="Действия"><svg><use href="#i-more"/></svg></button>`;
+  return`<div class="row${cur?" current":""}">
+    <button class="main" data-act="play" data-id="${t.id}"${opts.edit?" disabled":""}>
+      ${coverHTML(t)}
+      <div class="txt"><div class="t">${cur?'<span class="eq"><i></i><i></i><i></i></span>':""}${esc(t.title)}</div>
+        <div class="s">${esc(t.author||CAT1[t.cat])} · <span class="num">${fmt(t.duration)}</span></div>
+        ${showProg?`<div class="prog"><i style="width:${Math.min(100,p/t.duration*100).toFixed(1)}%"></i></div>`:""}
+      </div>
+    </button>${right}</div>`}
+
+function emptyLibrary(){return`<div class="ttl"><h1>Записи</h1></div><div class="empty">
+  <div class="ill"><svg><use href="#i-wave"/></svg></div>
+  <h3>Добавь первые записи</h3>
+  <p>Коран, нашиды, лекции — любые аудиофайлы с айфона. Без рекламы и подписок.</p>
+  <ol class="steps">
+    <li><b>1</b><span>Нажми зелёный плюс внизу и выбери файлы в «Файлах». Можно сразу пачкой.</span></li>
+    <li><b>2</b><span>Если файл назван «Автор - Название», автор подставится сам.</span></li>
+    <li><b>3</b><span>Собирай плейлисты и расставляй порядок.</span></li>
+  </ol></div>
+  <div class="hint">Плюс — справа внизу <svg><use href="#i-down"/></svg></div>`}
+
+function render(){
+  for(const k of ["library","playlists","search"]){const b=$("#tb-"+k);const on=S.view===k||(k==="playlists"&&S.view==="playlist");on?b.setAttribute("aria-current","page"):b.removeAttribute("aria-current")}
+  document.body.classList.toggle("in-search",S.view==="search");$("#sdock").hidden=S.view!=="search";
+  const m=$("#main");
+  if(S.view==="library")m.innerHTML=renderLibrary();
+  else if(S.view==="playlists")m.innerHTML=renderPlaylists();
+  else if(S.view==="search")m.innerHTML=renderSearch();
+  else m.innerHTML=renderPlaylist();
+}
+function renderLibrary(){
+  if(!S.tracks.length){S.listIds=[];return emptyLibrary()}
+  const counts={all:S.tracks.length};for(const k in CATS)counts[k]=S.tracks.filter(t=>t.cat===k).length;
+  if(S.cat!=="all"&&!counts[S.cat]&&!isU(S.cat))S.cat="all";
+  let inCat=S.tracks.filter(t=>S.cat==="all"||t.cat===S.cat);
+  const ac={};inCat.forEach(t=>{const a=(t.author||"").trim();if(a)ac[a]=(ac[a]||0)+1});const authors=Object.keys(ac).sort((a,b)=>a.localeCompare(b,"ru"));
+  if(S.author&&!ac[S.author])S.author="";
+  let list=inCat.filter(t=>!S.author||(t.author||"").trim()===S.author).sort(SORTS[S.sort]?.f||SORTS.order.f);S.listIds=list.map(t=>t.id);
+  const total=list.reduce((a,t)=>a+(t.duration||0),0);
+  return`<div class="ttl"><h1>${S.cat==="all"?"Записи":CATS[S.cat]}</h1><span class="meta">${recs(list.length)} · ${fmtLong(total)}</span></div>
+  <div class="chips">${[["all","Все"],...Object.entries(CATS)].filter(([k])=>k==="all"||counts[k]||isU(k)).map(([k,v])=>`<button class="chip" data-act="cat" data-cat="${k}" aria-pressed="${S.cat===k}">${esc(v)}<span class="n">${counts[k]}</span></button>`).join("")}<button class="chip addc" data-act="newCat">+ Раздел</button></div>
+  ${isU(S.cat)?`<div class="ucat-tools"><button data-act="renCat">Переименовать</button><button data-act="delCat">Удалить раздел</button></div>`:""}
+  ${authors.length?`<div class="chips sub">${[["","Все авторы"],...authors.map(a=>[a,a])].map(([k,v])=>`<button class="chip" data-act="author" data-a="${esc(k)}" aria-pressed="${S.author===k}">${esc(v)}${k?`<span class="n">${ac[k]}</span>`:""}</button>`).join("")}</div>`:""}
+  <div class="sortrow"><span>Порядок</span>${Object.entries(SORTS).map(([k,o])=>`<button data-act="sort" data-s="${k}" aria-pressed="${(SORTS[S.sort]?S.sort:"order")===k}">${o.l}</button>`).join("")}</div>
+  <div class="pills"><button class="pill solid" data-act="playAll"><svg><use href="#i-play"/></svg>Слушать</button><button class="pill" data-act="shuffleAll"><svg><use href="#i-shuffle"/></svg>Вперемешку</button></div>
+  <div class="list">${list.map((t,i)=>rowHTML(t,i)).join("")}</div>`}
+
+function searchBody(){
+  const q=S.q.trim().toLowerCase();
+  if(!S.tracks.length)return`<div class="empty"><p>Пока нечего искать. Добавь записи плюсом внизу.</p></div>`;
+  if(!q){const recent=S.tracks.slice().sort((a,b)=>b.added-a.added).slice(0,8);S.listIds=recent.map(t=>t.id);
+    return`<div class="sec">Недавно добавленные</div><div class="list">${recent.map((t,i)=>rowHTML(t,i)).join("")}</div>`}
+  const list=S.tracks.filter(t=>(t.title+" "+t.author+" "+CATS[t.cat]).toLowerCase().includes(q)).sort((a,b)=>a.title.localeCompare(b.title,"ru"));
+  S.listIds=list.map(t=>t.id);
+  return list.length?`<div class="sec">Найдено: ${list.length}</div><div class="list">${list.map((t,i)=>rowHTML(t,i)).join("")}</div>`
+    :`<div class="empty"><p>Ничего не нашлось по запросу «${esc(S.q)}»</p></div>`}
+function renderSearch(){return`<div class="ttl"><h1>Поиск</h1></div><div id="sBody">${searchBody()}</div>`}
+
+function plArt(pl){const cs=pl.ids.slice(0,4).map(id=>byId(id)).filter(Boolean);
+  const col={quran:"var(--accent)",nasheed:"var(--caramel)",lecture:"var(--lavender)",other:"var(--muted)"};
+  return`<div class="art">${[0,1,2,3].map(i=>{const t=cs[i];return`<span style="background:${t?`color-mix(in srgb,${col[t.cat]||"var(--lavender)"} ${24+i*9}%,var(--surface))`:"var(--surface-2)"}"></span>`}).join("")}</div>`}
+function renderPlaylists(){
+  return`<div class="ttl"><h1>Плейлисты</h1><span class="meta">${S.playlists.length||""}</span></div>
+  <div class="pl-grid">${S.playlists.slice().sort((a,b)=>b.created-a.created).map(pl=>{
+    const ids=pl.ids.filter(id=>byId(id));const dur=ids.reduce((a,id)=>a+(byId(id)?.duration||0),0);
+    return`<button class="pl-card" data-act="openPl" data-id="${pl.id}">${plArt(pl)}<div class="nm">${esc(pl.name)}</div><div class="ct">${recs(ids.length)}${ids.length?" · "+fmtLong(dur):""}</div></button>`}).join("")}
+    <button class="pl-card new" data-act="newPl"><div class="art"><svg><use href="#i-plus"/></svg></div><div class="nm">Новый плейлист</div></button></div>`}
+
+function renderPlaylist(){
+  const pl=S.playlists.find(p=>p.id===S.plId);if(!pl){S.view="playlists";return renderPlaylists()}
+  pl.ids=pl.ids.filter(id=>byId(id));const list=pl.ids.map(byId);S.listIds=pl.ids.slice();
+  const dur=list.reduce((a,t)=>a+(t.duration||0),0);
+  return`<button class="back" data-act="tab" data-tab="playlists"><svg><use href="#i-left"/></svg>Плейлисты</button>
+  <div class="ttl"><h1>${esc(pl.name)}</h1><button class="ib" data-act="plMenu" aria-label="Действия с плейлистом"><svg><use href="#i-more"/></svg></button></div>
+  <div class="sec" style="margin-top:-8px">${recs(list.length)}${list.length?" · "+fmtLong(dur):""}</div>
+  ${S.editPl?`<div class="pills"><button class="pill solid" data-act="editPl">Готово</button><button class="pill" data-act="plAdd"><svg><use href="#i-plus"/></svg>Добавить</button></div>`
+   :list.length?`<div class="pills"><button class="pill solid" data-act="plPlay"><svg><use href="#i-play"/></svg>Слушать</button><button class="pill" data-act="plShuffle"><svg><use href="#i-shuffle"/></svg>Вперемешку</button></div>`:""}
+  ${list.length?`<div class="list">${list.map((t,i)=>rowHTML(t,i,{edit:S.editPl,last:i===list.length-1})).join("")}</div>`
+   :`<div class="empty"><h3>Плейлист пока пустой</h3><p>Добавь записи из библиотеки или новые файлы с телефона.</p>
+     <div class="sheet-actions"><button class="btn primary" data-act="plAdd">Из библиотеки</button><button class="btn" data-act="add">Новые файлы</button></div></div>`}`}
+
+/* ---------- sheet ---------- */
+function openSheet(html,mount){$("#sheetCard").innerHTML=`<div class="grab"></div>`+html;$("#scrim").hidden=false;$("#sheet").hidden=false;mount&&mount($("#sheetCard"))}
+function closeSheet(){$("#scrim").hidden=true;$("#sheet").hidden=true;$("#sheetCard").innerHTML=""}
+
+function trackMenu(id){const t=byId(id);if(!t)return;
+  openSheet(`<h3>${esc(t.title)}</h3><div class="sub">${esc(t.author||CAT1[t.cat])} · ${fmt(t.duration)} · ${fmtSize(t.size)}</div>
+  <div class="menu">
+    <button data-act="playNext" data-id="${id}"><svg><use href="#i-play"/></svg>Слушать следующей</button>
+    <button data-act="toPl" data-id="${id}"><svg><use href="#i-list"/></svg>Добавить в плейлист</button>
+    <button data-act="editTrack" data-id="${id}"><svg><use href="#i-edit"/></svg>Название и автор</button>
+    <button data-act="shareTrack" data-id="${id}"><svg><use href="#i-share"/></svg>Отправить</button>
+    ${pos[id]?`<button data-act="resetPos" data-id="${id}"><svg><use href="#i-back15"/></svg>Начать сначала</button>`:""}
+    <button class="danger" data-act="delTrack" data-id="${id}"><svg><use href="#i-trash"/></svg>Удалить из плеера</button>
+  </div>`)}
+
+function saveUcats(){LS.set("ucats",UCATS);applyUcats()}
+function addUcat(name){name=name.trim().slice(0,30);const ex=Object.entries(CATS).find(([k,v])=>v.toLowerCase()===name.toLowerCase());if(ex)return ex[0];
+  const id="u_"+uid();UCATS.push({id,name});saveUcats();return id}
+function nameSheet(title,val,fn){openSheet(`<h3>${esc(title)}</h3><div class="field"><label for="f-cname">Название</label><input id="f-cname" maxlength="30" value="${esc(val)}" placeholder="Например, Сира"></div>
+  <div class="sheet-actions"><button class="btn" data-act="closeSheet">Отмена</button><button class="btn primary" id="f-cok">Сохранить</button></div>`,
+  card=>{const i=card.querySelector("#f-cname");setTimeout(()=>i.focus(),50);card.querySelector("#f-cok").onclick=()=>{const n=i.value.trim();if(!n){i.focus();return}closeSheet();fn(n)}})}
+function editTrack(id){const t=byId(id);let cat=t.cat;
+  openSheet(`<h3>Запись</h3><div class="sub">${esc(t.fileName)}</div>
+   <div class="field"><label for="f-title">Название</label><input id="f-title" value="${esc(t.title)}"></div>
+   <div class="field"><label for="f-author">Автор, чтец или лектор</label><input id="f-author" value="${esc(t.author)}" placeholder="Например, Мишари Рашид"></div>
+   <div class="field"><label>Раздел</label><div class="seg wrap">${Object.entries(CATS).map(([k,v])=>`<button data-c="${k}" aria-pressed="${k===cat}">${esc(v)}</button>`).join("")}</div><input id="f-newcat" placeholder="Или новый раздел, например «Сира»" style="margin-top:8px"></div>
+   <div class="sheet-actions"><button class="btn" data-act="closeSheet">Отмена</button><button class="btn primary" id="f-save">Сохранить</button></div>`,
+  card=>{card.querySelectorAll(".seg button").forEach(b=>b.onclick=()=>{cat=b.dataset.c;card.querySelectorAll(".seg button").forEach(x=>x.setAttribute("aria-pressed",x===b))});
+    card.querySelector("#f-save").onclick=async()=>{t.title=card.querySelector("#f-title").value.trim()||t.title;t.author=card.querySelector("#f-author").value.trim();const nc=card.querySelector("#f-newcat").value.trim();if(nc)cat=addUcat(nc);t.cat=cat;
+      await DB.put("tracks",t).catch(()=>{});closeSheet();render();updateNow();toast("Сохранено")}})}
+
+function toPl(id){
+  const items=S.playlists.map(pl=>`<label><input type="checkbox" data-pl="${pl.id}"${pl.ids.includes(id)?" checked":""}><span class="nm">${esc(pl.name)}</span><span class="au">${pl.ids.length}</span></label>`).join("");
+  openSheet(`<h3>В плейлист</h3><div class="sub">${esc(byId(id).title)}</div>
+    ${items?`<div class="checklist" style="margin-bottom:14px">${items}</div>`:""}
+    <div class="field"><label for="f-newpl">Новый плейлист</label><input id="f-newpl" placeholder="Например, Сура Аль-Кахф"></div>
+    <div class="sheet-actions"><button class="btn primary" id="f-ok">Готово</button></div>`,
+  card=>card.querySelector("#f-ok").onclick=async()=>{
+    for(const cb of card.querySelectorAll("input[data-pl]")){const pl=S.playlists.find(p=>p.id===cb.dataset.pl);const has=pl.ids.includes(id);
+      if(cb.checked&&!has){pl.ids.push(id);await DB.put("playlists",pl).catch(()=>{})}else if(!cb.checked&&has){pl.ids=pl.ids.filter(x=>x!==id);await DB.put("playlists",pl).catch(()=>{})}}
+    const nm=card.querySelector("#f-newpl").value.trim();
+    if(nm){const pl={id:uid(),name:nm,ids:[id],created:Date.now()};S.playlists.push(pl);await DB.put("playlists",pl).catch(()=>{})}
+    closeSheet();render();toast("Плейлисты обновлены")})}
+
+function newPl(){openSheet(`<h3>Новый плейлист</h3><div class="sub">Потом добавишь записи и расставишь порядок</div>
+  <div class="field"><label for="f-pln">Название</label><input id="f-pln" placeholder="Например, Джуз Амма"></div>
+  <div class="sheet-actions"><button class="btn" data-act="closeSheet">Отмена</button><button class="btn primary" id="f-ok">Создать</button></div>`,
+  card=>{const inp=card.querySelector("#f-pln");
+    card.querySelector("#f-ok").onclick=async()=>{const nm=inp.value.trim();if(!nm){inp.focus();return}
+      const pl={id:uid(),name:nm,ids:[],created:Date.now()};S.playlists.push(pl);await DB.put("playlists",pl).catch(()=>{});
+      closeSheet();S.view="playlist";S.plId=pl.id;S.editPl=false;render();if(S.tracks.length)plAdd()}})}
+
+function plAdd(){const pl=S.playlists.find(p=>p.id===S.plId);if(!pl)return;
+  if(!S.tracks.length){openSheet(`<h3>Записей пока нет</h3><div class="sub">Сначала добавь файлы с телефона</div><div class="sheet-actions"><button class="btn primary" data-act="add">Добавить файлы</button></div>`);return}
+  const list=S.tracks.slice().sort((a,b)=>b.added-a.added);
+  openSheet(`<h3>Добавить в «${esc(pl.name)}»</h3><div class="sub">Отмеченные встанут в конец. Порядок потом поменяешь.</div>
+   <div class="checklist">${list.map(t=>`<label><input type="checkbox" data-id="${t.id}"${pl.ids.includes(t.id)?" checked disabled":""}><span class="nm">${esc(t.title)}<br><span class="au">${esc(t.author||CAT1[t.cat])} · ${fmt(t.duration)}</span></span></label>`).join("")}</div>
+   <div class="sheet-actions"><button class="btn" data-act="closeSheet">Отмена</button><button class="btn primary" id="f-ok">Добавить</button></div>`,
+  card=>card.querySelector("#f-ok").onclick=async()=>{
+    const add=[...card.querySelectorAll("input[data-id]:checked:not(:disabled)")].map(c=>c.dataset.id);
+    pl.ids.push(...add);await DB.put("playlists",pl).catch(()=>{});closeSheet();render();if(add.length)toast(`Добавлено: ${add.length}`)})}
+
+function plMenu(){const pl=S.playlists.find(p=>p.id===S.plId);
+  openSheet(`<h3>${esc(pl.name)}</h3><div class="sub">${recs(pl.ids.length)}</div><div class="menu">
+   <button data-act="plAdd"><svg><use href="#i-plus"/></svg>Добавить записи</button>
+   <button data-act="editPl"${pl.ids.length?"":" disabled"}><svg><use href="#i-list"/></svg>Изменить порядок</button>
+   <button data-act="renamePl"><svg><use href="#i-edit"/></svg>Переименовать</button>
+   <button data-act="sharePl"${pl.ids.length?"":" disabled"}><svg><use href="#i-share"/></svg>Отправить весь плейлист</button>
+   <button class="danger" data-act="delPl"><svg><use href="#i-trash"/></svg>Удалить плейлист</button></div>`)}
+
+function confirmSheet(title,sub,label,fn){openSheet(`<h3>${esc(title)}</h3><div class="sub">${esc(sub)}</div>
+  <div class="sheet-actions"><button class="btn" data-act="closeSheet">Отмена</button><button class="btn red" id="f-ok">${esc(label)}</button></div>`,
+  card=>card.querySelector("#f-ok").onclick=async()=>{await fn();closeSheet()})}
+
+function queueSheet(){if(!S.queue.length)return;
+  openSheet(`<h3>Очередь</h3><div class="sub">${recs(S.queue.length)}${S.repeat==="all"?" · по кругу":""}${S.shuffle?" · вперемешку":""}</div>
+  <div class="qlist">${S.queue.map((id,i)=>{const t=byId(id);if(!t)return"";return`<button data-act="jump" data-i="${i}"><span class="i">${i+1}</span><span class="nm${i===S.qi?" cur":""}">${esc(t.title)}</span></button>`}).join("")}</div>`,
+  card=>{const c=card.querySelector(".nm.cur");c&&c.scrollIntoView({block:"center"})})}
+
+/* ---------- share ---------- */
+let dlP=null;
+function getDl(){if(!dlP)dlP=(window.claude&&window.claude.use)?window.claude.use("downloads").catch(()=>null):Promise.resolve(null);return dlP}
+const CRC=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+function crc32(u8){let c=0xFFFFFFFF;for(let i=0;i<u8.length;i++)c=CRC[(c^u8[i])&255]^(c>>>8);return(c^0xFFFFFFFF)>>>0}
+function makeZip(files){const enc=new TextEncoder(),parts=[],central=[];let off=0;
+  for(const f of files){const nm=enc.encode(f.name),crc=crc32(f.data),sz=f.data.length;
+    const h=new DataView(new ArrayBuffer(30));h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(12,0x21,true);
+    h.setUint32(14,crc,true);h.setUint32(18,sz,true);h.setUint32(22,sz,true);h.setUint16(26,nm.length,true);parts.push(h.buffer,nm,f.data);
+    const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(14,0x21,true);
+    c.setUint32(16,crc,true);c.setUint32(20,sz,true);c.setUint32(24,sz,true);c.setUint16(28,nm.length,true);c.setUint32(42,off,true);central.push(c.buffer,nm);
+    off+=30+nm.length+sz}
+  const cd=central.reduce((a,b)=>a+b.byteLength,0);const e=new DataView(new ArrayBuffer(22));
+  e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cd,true);e.setUint32(16,off,true);
+  return new Blob([...parts,...central,e.buffer],{type:"application/zip"})}
+const safe=s=>String(s).replace(/[\\/:*?"<>|]+/g," ").replace(/\s+/g," ").trim().slice(0,120)||"audio";
+async function shareTracks(ids,name){
+  const files=[];let i=0;
+  for(const id of ids){const t=byId(id);const b=await DB.get("blobs",id).catch(()=>null);if(!t||!b)continue;i++;
+    const ext=(t.fileName.match(/\.[a-z0-9]{2,5}$/i)||[".mp3"])[0];
+    files.push({name:(ids.length>1?String(i).padStart(2,"0")+" ":"")+safe((t.author?t.author+" - ":"")+t.title)+ext,data:new Uint8Array(b.buf),type:b.type})}
+  if(!files.length)return;
+  // 1) системное меню «Поделиться»: отдаёт сами аудиофайлы
+  try{const fl=files.map(f=>new File([f.data],f.name,{type:f.type||"audio/mpeg"}));
+    if(navigator.canShare&&navigator.canShare({files:fl})){await navigator.share({files:fl,title:name});return}}
+  catch(err){if(err&&err.name==="AbortError")return}
+  // 2) сохранение через Claude
+  const dl=await getDl();
+  if(dl){try{const one=files.length===1&&/\.mp3$/i.test(files[0].name);
+      await dl.save({filename:one?files[0].name:safe(name)+".zip",data:one?files[0].data:makeZip(files)});toast("Готово");return}
+    catch(err){const c=err&&err.code;if(c==="declined")return;if(c!=="unavailable"&&c!=="not_granted"){toast("Не получилось подготовить файл",3000);return}}}
+  // 3) обычная загрузка
+  try{const blob=files.length===1?new Blob([files[0].data],{type:files[0].type}):makeZip(files);const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);a.download=files.length===1?files[0].name:safe(name)+".zip";document.body.appendChild(a);a.click();
+    setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000)}catch(e){toast("Здесь отправка недоступна",3000)}}
+
+/* ---------- playback ---------- */
+let curUrl=null,loadedId=null,lastSave=0;
+async function loadTrack(id,autoplay=true){
+  const t=byId(id);if(!t)return;const b=await DB.get("blobs",id).catch(()=>null);
+  if(!b){toast("Файл записи не найден");return}
+  if(curUrl)URL.revokeObjectURL(curUrl);const ty=EXT[(t.fileName||"").split(".").pop().toLowerCase()]||b.type;const bl=new Blob([b.buf],{type:ty});curUrl=URL.createObjectURL(bl);
+  loadedId=id;au.dataset.fb="";au._bl=bl;au.src=curUrl;au.playbackRate=S.rate;
+  const resume=pos[id];
+  au.onloadedmetadata=()=>{au.playbackRate=S.rate;
+    if(!t.duration&&isFinite(au.duration)){t.duration=au.duration;DB.put("tracks",t).catch(()=>{})}
+    if(resume&&t.duration>600&&resume>30&&resume<t.duration-30){au.currentTime=resume;toast("Продолжаю с "+fmt(resume))}};
+  if(autoplay)au.play().catch(()=>{});
+  updateNow();refreshList();setMedia(t);
+}
+function refreshList(){if(S.view==="search"){const b=$("#sBody");if(b)b.innerHTML=searchBody()}else render()}
+function playQueue(ids,start=0,from=""){if(!ids.length)return;S.queue=ids.slice();S.orig=null;S.qi=start;S.from=from;
+  if(S.shuffle)applyShuffle();loadTrack(S.queue[S.qi])}
+function applyShuffle(){const cur=S.queue[S.qi];S.orig=S.queue.slice();const rest=S.queue.filter((x,i)=>i!==S.qi);
+  for(let i=rest.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[rest[i],rest[j]]=[rest[j],rest[i]]}
+  S.queue=[cur,...rest];S.qi=0}
+function next(user){if(!S.queue.length)return;
+  if(S.qi<S.queue.length-1){S.qi++;loadTrack(S.queue[S.qi])}
+  else if(S.repeat==="all"||user){S.qi=0;loadTrack(S.queue[0],S.repeat==="all"||user)}}
+function prev(){if(!S.queue.length)return;if(au.currentTime>4){au.currentTime=0;return}
+  if(S.qi>0){S.qi--;loadTrack(S.queue[S.qi])}else au.currentTime=0}
+function toggle(){if(!loadedId){if(S.listIds.length)playQueue(S.listIds,0,fromLabel());return}au.paused?au.play().catch(()=>{}):au.pause()}
+function fromLabel(){if(S.view==="playlist"){const p=S.playlists.find(x=>x.id===S.plId);return p?"Плейлист «"+p.name+"»":""}
+  if(S.view==="search")return S.q?"Поиск":"Недавние";return S.cat==="all"?"Все записи":CATS[S.cat]}
+
+au.addEventListener("play",syncPP);au.addEventListener("pause",syncPP);
+au.addEventListener("ended",()=>{if(loadedId){delete pos[loadedId];LS.set("pos",pos)}
+  if(S.sleepEnd){S.sleepEnd=false;updateSleep();syncPP();return}
+  if(S.repeat==="one"){au.currentTime=0;au.play().catch(()=>{});return}next(false)});
+au.addEventListener("timeupdate",()=>{tick();
+  const t=byId(loadedId);if(t&&t.duration>600&&Date.now()-lastSave>4000){lastSave=Date.now();pos[loadedId]=au.currentTime;LS.set("pos",pos)}
+  if(S.sleepAt&&Date.now()>=S.sleepAt){S.sleepAt=null;au.pause();updateSleep();toast("Таймер сна: пауза")}});
+au.addEventListener("error",async()=>{if(!loadedId||!au.src)return;
+  if(!au.dataset.fb&&au._bl&&au._bl.size<80e6){au.dataset.fb="1";const id=loadedId,at=au.currentTime;try{const u=await toDataUrl(au._bl);if(loadedId!==id)return;au.src=u;au.playbackRate=S.rate;au.play().catch(()=>{});return}catch(e){}}
+  toast("Не получается воспроизвести эту запись здесь",3500)});
+
+function syncPP(){const p=!au.paused;document.body.classList.toggle("is-playing",p);
+  for(const s of [$("#miniPP"),$("#npPP")])s.innerHTML=`<use href="#i-${p?"pause":"play"}"/>`;
+  if("mediaSession"in navigator)try{navigator.mediaSession.playbackState=p?"playing":"paused"}catch(e){}}
+let seeking=false;
+function tick(){const d=au.duration||byId(loadedId)?.duration||0,c=au.currentTime||0;const pct=d?c/d*100:0;
+  $("#miniLine").style.width=pct+"%";
+  if(!seeking){const s=$("#seek");s.value=d?Math.round(c/d*1000):0;s.style.setProperty("--p",pct+"%")}
+  $("#tCur").textContent=fmt(c);$("#tLeft").textContent="-"+fmt(d-c)}
+function updateNow(){const t=byId(loadedId);
+  document.body.classList.toggle("has-mini",!!t);$("#mini").hidden=!t;if(!t)return;
+  $("#miniT").textContent=t.title;$("#miniS").textContent=t.author||CAT1[t.cat];
+  const mc=$("#miniCover");mc.className="cover "+t.cat;mc.textContent=CATMARK[t.cat];
+  $("#npT").textContent=t.title;$("#npA").textContent=t.author||"Автор не указан";$("#npCat").textContent=CAT1[t.cat];
+  $("#npFrom").textContent=S.from||"Сейчас играет";if(!$("#np").hidden)drawDisc(t);syncOpts();tick();syncPP()}
+function drawDisc(t){const cv=$("#discCv"),r=cv.getBoundingClientRect(),dpr=window.devicePixelRatio||1;
+  const w=Math.max(200,r.width||280),h=w;cv.width=w*dpr;cv.height=h*dpr;const g=cv.getContext("2d");g.scale(dpr,dpr);
+  const css=getComputedStyle(document.documentElement);const v=n=>css.getPropertyValue(n).trim();
+  const col={quran:v("--accent"),nasheed:v("--caramel"),lecture:v("--lavender"),other:v("--muted")}[t.cat]||v("--lavender");
+  g.fillStyle=v("--surface");g.fillRect(0,0,w,h);
+  const grd=g.createRadialGradient(w*.3,h*.25,10,w*.5,h*.5,w*.8);grd.addColorStop(0,col);grd.addColorStop(1,v("--surface"));
+  g.globalAlpha=.22;g.fillStyle=grd;g.fillRect(0,0,w,h);g.globalAlpha=1;
+  let seed=0;for(const ch of t.id+t.title)seed=(seed*31+ch.charCodeAt(0))>>>0;const rnd=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296};
+  const n=22,pad=w*.14,bw=(w-pad*2)/n;g.fillStyle=col;
+  for(let i=0;i<n;i++){const env=Math.sin(Math.PI*(i+.5)/n);const hh=Math.max(bw*.6,(0.25+0.75*rnd())*env*h*0.5);
+    g.globalAlpha=0.35+0.55*env;const x=pad+i*bw+bw*0.2,ww=bw*0.6,y=(h-hh)/2;
+    g.beginPath();g.roundRect?g.roundRect(x,y,ww,hh,ww/2):g.rect(x,y,ww,hh);g.fill()}
+  g.globalAlpha=1}
+function syncOpts(){$("#speedVal").textContent=String(S.rate).replace(".",",")+"×";$("#optSpeed").classList.toggle("on",S.rate!==1);
+  $("#optRepeat").classList.toggle("on",S.repeat!=="off");$("#repeatLbl").textContent=S.repeat==="one"?"Одну":S.repeat==="all"?"Все":"Повтор";
+  $("#optShuffle").classList.toggle("on",S.shuffle);updateSleep()}
+function updateSleep(){const on=S.sleepAt||S.sleepEnd;$("#optSleep").classList.toggle("on",!!on);
+  $("#sleepLbl").textContent=S.sleepEnd?"В конце":S.sleepAt?Math.max(1,Math.ceil((S.sleepAt-Date.now())/60000))+" мин":"Сон"}
+setInterval(()=>{if(S.sleepAt)updateSleep()},20000);
+
+const seek=$("#seek");
+seek.addEventListener("input",()=>{seeking=true;const d=au.duration||0;seek.style.setProperty("--p",seek.value/10+"%");$("#tCur").textContent=fmt(seek.value/1000*d)});
+seek.addEventListener("change",()=>{const d=au.duration||0;if(d)au.currentTime=seek.value/1000*d;seeking=false});
+
+function setMedia(t){if(!("mediaSession"in navigator))return;try{
+  navigator.mediaSession.metadata=new MediaMetadata({title:t.title,artist:t.author||CAT1[t.cat],album:S.from||"Аудиоплеер"});
+  const ms=navigator.mediaSession;ms.setActionHandler("play",()=>au.play());ms.setActionHandler("pause",()=>au.pause());
+  ms.setActionHandler("nexttrack",()=>next(true));ms.setActionHandler("previoustrack",prev);
+  ms.setActionHandler("seekbackward",()=>au.currentTime=Math.max(0,au.currentTime-15));ms.setActionHandler("seekforward",()=>au.currentTime=au.currentTime+15);
+}catch(e){}}
+
+function openNP(){$("#np").hidden=false;document.body.style.overflow="hidden";const t=byId(loadedId);if(t)requestAnimationFrame(()=>drawDisc(t))}
+function closeNP(){$("#np").hidden=true;document.body.style.overflow=""}
+/* свайп вниз закрывает плеер */
+(()=>{let y0=null;const np=$("#np");
+  np.addEventListener("touchstart",e=>{y0=np.scrollTop<=0&&!e.target.closest("input")?e.touches[0].clientY:null},{passive:true});
+  np.addEventListener("touchend",e=>{if(y0!=null&&e.changedTouches[0].clientY-y0>110)closeNP();y0=null},{passive:true});})();
+
+/* ---------- events ---------- */
+$("#q").addEventListener("input",e=>{S.q=e.target.value;const b=$("#sBody");if(b)b.innerHTML=searchBody()});
+document.addEventListener("click",async e=>{
+  const el=e.target.closest("[data-act]");if(!el||el.disabled)return;const a=el.dataset.act,id=el.dataset.id,i=+el.dataset.i;
+  const pl=S.playlists.find(p=>p.id===S.plId);
+  switch(a){
+    case"newCat":nameSheet("Новый раздел","",n=>{const id=addUcat(n);S.cat=id;S.author="";render();toast("Раздел «"+n+"» создан. Добавляй файлы плюсом, они попадут сюда")});break;
+    case"renCat":{const c=UCATS.find(x=>x.id===S.cat);if(c)nameSheet("Переименовать раздел",c.name,n=>{c.name=n;saveUcats();render()});break}
+    case"delCat":{const c=UCATS.find(x=>x.id===S.cat);if(!c)break;const n=S.tracks.filter(x=>x.cat===c.id);
+      confirmSheet("Удалить раздел?",n.length?`${recs(n.length)} перейдут в «Другое». Сами файлы останутся.`:"Раздел пустой.","Удалить",async()=>{for(const x of n){x.cat="other";await DB.put("tracks",x).catch(()=>{})}UCATS=UCATS.filter(x=>x.id!==c.id);saveUcats();S.cat="all";render()});break}
+    case"add":closeSheet();$("#picker").click();break;
+    case"tab":{const tb=el.dataset.tab;const same=S.view===tb;S.view=tb;S.editPl=false;render();window.scrollTo(0,0);
+      if(tb==="search"&&same)$("#q").focus();break}
+    case"cat":S.cat=el.dataset.cat;S.author="";render();break;
+    case"author":S.author=el.dataset.a||"";render();break;
+    case"sort":S.sort=el.dataset.s;LS.set("sort",S.sort);render();break;
+    case"play":{if(S.queue[S.qi]===id&&loadedId===id){au.paused?au.play().catch(()=>{}):openNP();break}const idx=S.listIds.indexOf(id);playQueue(S.listIds,Math.max(0,idx),fromLabel());break}
+    case"playAll":case"plPlay":S.shuffle=false;playQueue(S.listIds,0,fromLabel());break;
+    case"shuffleAll":case"plShuffle":S.shuffle=true;playQueue(S.listIds,Math.floor(Math.random()*S.listIds.length),fromLabel());break;
+    case"trackMenu":trackMenu(id);break;
+    case"closeSheet":closeSheet();break;
+    case"editTrack":editTrack(id);break;
+    case"toPl":toPl(id);break;
+    case"shareTrack":closeSheet();{const t=byId(id);shareTracks([id],(t.author?t.author+" - ":"")+t.title)}break;
+    case"resetPos":delete pos[id];LS.set("pos",pos);if(loadedId===id)au.currentTime=0;closeSheet();refreshList();toast("Начнётся сначала");break;
+    case"playNext":{closeSheet();if(!S.queue.length){playQueue([id],0,"Записи");break}
+      const cur=S.queue[S.qi];S.queue=S.queue.filter((x,k)=>x!==id||k===S.qi);S.qi=S.queue.indexOf(cur);S.queue.splice(S.qi+1,0,id);toast("Будет следующей");break}
+    case"delTrack":{const t=byId(id);confirmSheet("Удалить запись?",`«${t.title}» пропадёт из плеера и плейлистов. Оригинал в «Файлах» останется.`,"Удалить",async()=>{
+      if(loadedId===id){au.pause();au.removeAttribute("src");au.load();loadedId=null;S.queue=[];S.qi=-1;closeNP()}
+      else{const cur=S.queue[S.qi];S.queue=S.queue.filter(x=>x!==id);S.qi=S.queue.indexOf(cur)}
+      S.tracks=S.tracks.filter(x=>x.id!==id);delete pos[id];LS.set("pos",pos);
+      for(const p of S.playlists)if(p.ids.includes(id)){p.ids=p.ids.filter(x=>x!==id);await DB.put("playlists",p).catch(()=>{})}
+      await DB.del("tracks",id).catch(()=>{});await DB.del("blobs",id).catch(()=>{});updateNow();render();toast("Удалено")})}break;
+    case"newPl":newPl();break;
+    case"openPl":S.view="playlist";S.plId=id;S.editPl=false;render();window.scrollTo(0,0);break;
+    case"plMenu":plMenu();break;
+    case"plAdd":plAdd();break;
+    case"editPl":closeSheet();S.editPl=!S.editPl;render();break;
+    case"mvUp":if(i>0){[pl.ids[i-1],pl.ids[i]]=[pl.ids[i],pl.ids[i-1]];await DB.put("playlists",pl).catch(()=>{});render()}break;
+    case"mvDown":if(i<pl.ids.length-1){[pl.ids[i+1],pl.ids[i]]=[pl.ids[i],pl.ids[i+1]];await DB.put("playlists",pl).catch(()=>{});render()}break;
+    case"plRemove":pl.ids.splice(i,1);await DB.put("playlists",pl).catch(()=>{});if(!pl.ids.length)S.editPl=false;render();break;
+    case"renamePl":openSheet(`<h3>Переименовать</h3><div class="field" style="margin-top:12px"><label for="f-rn">Название</label><input id="f-rn" value="${esc(pl.name)}"></div>
+      <div class="sheet-actions"><button class="btn" data-act="closeSheet">Отмена</button><button class="btn primary" id="f-ok">Сохранить</button></div>`,
+      card=>card.querySelector("#f-ok").onclick=async()=>{const v=card.querySelector("#f-rn").value.trim();if(v){pl.name=v;await DB.put("playlists",pl).catch(()=>{})}closeSheet();render()});break;
+    case"sharePl":closeSheet();shareTracks(pl.ids,pl.name);break;
+    case"delPl":confirmSheet("Удалить плейлист?",`«${pl.name}» удалится, записи останутся в библиотеке.`,"Удалить",async()=>{
+      S.playlists=S.playlists.filter(p=>p.id!==pl.id);await DB.del("playlists",pl.id).catch(()=>{});S.view="playlists";render()});break;
+    case"openNP":openNP();break;
+    case"closeNP":closeNP();break;
+    case"npMore":if(loadedId)trackMenu(loadedId);break;
+    case"queue":queueSheet();break;
+    case"toggle":toggle();break;
+    case"next":next(true);break;
+    case"prev":prev();break;
+    case"back15":au.currentTime=Math.max(0,au.currentTime-15);break;
+    case"fwd15":au.currentTime=Math.min((au.duration||0)-0.5,au.currentTime+15);break;
+    case"jump":closeSheet();S.qi=i;loadTrack(S.queue[i]);break;
+    case"speed":{const r=[0.75,1,1.25,1.5,1.75,2];S.rate=r[(r.indexOf(S.rate)+1)%r.length];au.playbackRate=S.rate;LS.set("rate",S.rate);syncOpts();break}
+    case"repeat":S.repeat={off:"all",all:"one",one:"off"}[S.repeat];LS.set("repeat",S.repeat);syncOpts();
+      toast(S.repeat==="one"?"Повтор одной записи":S.repeat==="all"?"Повтор всей очереди":"Повтор выключен");break;
+    case"shuffle":S.shuffle=!S.shuffle;
+      if(S.queue.length){if(S.shuffle)applyShuffle();else if(S.orig){const cur=S.queue[S.qi];S.queue=S.orig;S.orig=null;S.qi=S.queue.indexOf(cur)}}
+      syncOpts();toast(S.shuffle?"Вперемешку":"По порядку");break;
+    case"sleep":openSheet(`<h3>Таймер сна</h3><div class="sub">Плеер сам встанет на паузу</div><div class="menu">
+      ${[15,30,45,60].map(m=>`<button data-act="setSleep" data-m="${m}"><svg><use href="#i-moon"/></svg>Через ${m} минут</button>`).join("")}
+      <button data-act="setSleep" data-m="end"><svg><use href="#i-moon"/></svg>В конце этой записи</button>
+      ${S.sleepAt||S.sleepEnd?`<button class="danger" data-act="setSleep" data-m="off"><svg><use href="#i-x"/></svg>Выключить таймер</button>`:""}</div>`);break;
+    case"setSleep":{const m=el.dataset.m;S.sleepAt=null;S.sleepEnd=false;
+      if(m==="end"){S.sleepEnd=true;toast("Остановлю в конце записи")}else if(m!=="off"){S.sleepAt=Date.now()+(+m)*60000;toast(`Пауза через ${m} минут`)}
+      closeSheet();updateSleep();break}
+  }
+});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!$("#sheet").hidden)closeSheet();else if(!$("#np").hidden)closeNP()}});
+
+/* ---------- boot ---------- */
+(async()=>{
+  try{UCATS=LS.get("ucats",[]);applyUcats();S.tracks=await DB.all("tracks")||[];S.tracks.forEach(x=>{if(!CATS[x.cat])x.cat="other"});S.playlists=await DB.all("playlists")||[]}catch(e){S.noDB=true}
+  render();syncOpts();
+  if(S.noDB)toast("Браузер не дал сохранить записи. Открой плеер в Safari",5000);
+  if("serviceWorker"in navigator&&document.querySelector('link[rel="manifest"]')){try{navigator.serviceWorker.register("sw.js").catch(()=>{})}catch(e){}}
+})();
+})();
+</script>
+
+</body></html>
